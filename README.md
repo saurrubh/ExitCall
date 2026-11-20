@@ -1,4 +1,6 @@
-# Exit Call - an Escape from awkwardness
+# ExitCall - Escape from Awkwardness
+
+**[Download the Android APK](https://github.com/saurrubh/endcalls/releases/latest)**
 
 Exit Call is a small Flutter app for scheduling a simulated incoming call on Android. It's for those moments when you could use a reason to step away. Pick a caller, set a delay, and the call screen appears when it's time.
 
