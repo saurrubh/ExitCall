@@ -1,6 +1,6 @@
 # ExitCall - Escape from Awkwardness
 
-**[Download the Android APK](https://github.com/saurrubh/endcalls/releases/latest)**
+**[Download the Android APK](https://github.com/saurrubh/ExitCall/releases/latest)**
 
 Exit Call is a small Flutter app for scheduling a simulated incoming call on Android. It's for those moments when you could use a reason to step away. Pick a caller, set a delay, and the call screen appears when it's time.
 
@@ -10,7 +10,11 @@ Exit Call is a small Flutter app for scheduling a simulated incoming call on And
 2. Pick a call style. The options are inspired by Google Phone, Samsung Phone, and WhatsApp, with a simple Classic style too.
 3. Tap **Preview incoming call** to try the screen right away, or choose a delay or a specific time and tap **Schedule call**.
 
-Exit Call keeps one scheduled call at a time. You can cancel it from the scheduled call card. The app runs locally, and the caller name and number are used for display.
+Turn on **Repeat every minute** to ring again one minute after the first call. Tap **Stop** on the scheduled call card to end the loop.
+
+Choose **System Phone** to use your device's default Phone app. Open **Calling accounts** and enable **Exit Call** once, then preview or schedule as usual. The Phone app controls the screen and may list simulated calls in Recents.
+
+Exit Call keeps one schedule at a time. Calls are simulated locally.
 
 Android may ask you to allow notifications and **Alarms & reminders** when you schedule your first call. Turn on **Show on lock screen** if you want the incoming screen to open over the lock screen. Depending on your Android settings, the call may appear as a notification you can tap to open.
 
@@ -33,7 +37,7 @@ On Windows, you can also run `.\run.ps1` from PowerShell. It uses the workspace 
 
 To build an APK you can install, run `flutter build apk --release` or `.\build.ps1` on Windows. The APK is written to `build/app/outputs/flutter-apk/app-release.apk`.
 
-The APK uses Android debug signing for local installs. The [F-Droid build recipe](.fdroid.yml) uses the same source and builds an unsigned APK for repository signing. Listing text and the release changelog live in [Fastlane metadata](fastlane/metadata/android/en-US).
+Local builds use Android debug signing. GitHub release APKs use the Exit Call release key. The [F-Droid build recipe](.fdroid.yml) uses the same source and builds an unsigned APK for repository signing. Listing text and the release changelog live in [Fastlane metadata](fastlane/metadata/android/en-US).
 
 ## License
 

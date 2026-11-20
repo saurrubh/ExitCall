@@ -1,0 +1,2 @@
+Use the Android Phone app for simulated incoming calls with System Phone.
+Repeat calls every minute after the first scheduled ring. Use Stop to end the loop.

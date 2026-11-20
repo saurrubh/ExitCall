@@ -17,6 +17,12 @@
         <activity android:name=".CallActivity" android:exported="false" android:excludeFromRecents="true"
             android:taskAffinity="local.exitcall.incoming" android:showWhenLocked="true" android:turnScreenOn="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+        <service android:name=".SystemCallService" android:exported="true"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
         <receiver android:name=".CallAlarm" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

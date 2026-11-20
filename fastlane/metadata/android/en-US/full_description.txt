@@ -2,4 +2,6 @@ Exit Call lets you simulate an incoming call at a time you choose. Add a caller 
 
 Choose a preset or design your own screen. Move the caller name, number, avatar, and controls. Set colors, fonts, labels, button dimensions, and tap or swipe actions for answering, declining, and ending the call.
 
-The simulation runs on your device. Android uses notification and alarm access to show scheduled calls. Lock-screen delivery depends on your system settings.
+Repeat a call every minute until you tap Stop. On compatible devices, System Phone lets the default Phone app show the incoming call after you enable Exit Call in Calling accounts.
+
+The simulation runs on your device. Lock-screen delivery depends on your Android settings.

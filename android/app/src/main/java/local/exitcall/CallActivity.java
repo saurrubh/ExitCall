@@ -3,11 +3,24 @@ package local.exitcall;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.WindowManager;
+import androidx.lifecycle.Lifecycle;
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 
 public final class CallActivity extends FlutterActivity {
+    private static CallActivity answeredCall;
+
+    static boolean hasVisibleAnsweredCall() {
+        return answeredCall != null && !answeredCall.isFinishing()
+                && answeredCall.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED);
+    }
+
+    @Override protected void onDestroy() {
+        if (answeredCall == this) answeredCall = null;
+        super.onDestroy();
+    }
+
     @Override protected void onCreate(Bundle saved) {
         if (android.os.Build.VERSION.SDK_INT < 27) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
@@ -32,6 +45,7 @@ public final class CallActivity extends FlutterActivity {
                 .setMethodCallHandler((call, result) -> {
                     switch (call.method) {
                         case "silence":
+                            answeredCall = this;
                             CallAlarm.notifications(this).cancel(CallAlarm.ALERT);
                             result.success(null);
                             break;

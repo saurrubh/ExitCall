@@ -11,8 +11,16 @@ part 'custom_call.dart';
 part 'call_design_editor.dart';
 
 const calls = MethodChannel('local.exitcall/calls');
-const presets = ['Google Phone', 'Samsung', 'WhatsApp', 'Classic', 'Custom'];
+const presets = [
+  'Google Phone',
+  'Samsung',
+  'WhatsApp',
+  'Classic',
+  'Custom',
+  'System Phone',
+];
 const customPreset = 4;
+const systemPhonePreset = 5;
 const durations = [10, 30, 60, 300, 600, 1800];
 const delayLabels = [
   '10 seconds',
@@ -86,10 +94,13 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
   int _preset = 0;
   int _delay = 0;
   bool _fullScreen = true;
+  bool _repeat = false;
   bool _busy = false;
   DateTime? _custom;
   Timer? _refreshTimer;
   CallDesign _design = const CallDesign();
+
+  bool get _systemPhone => _preset == systemPhonePreset;
 
   String get caller =>
       _name.text.trim().isEmpty ? 'Unknown caller' : _name.text.trim();
@@ -115,6 +126,13 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _refresh();
   }
 
+  bool _hasScheduledCall(Map<String, dynamic> status) {
+    final time = status['time'] as int? ?? 0;
+    return time > 0 &&
+        (status['repeat'] == true ||
+            time > DateTime.now().millisecondsSinceEpoch);
+  }
+
   void _apply(Map<String, dynamic> status, {bool restore = false}) {
     if (!mounted) return;
     setState(() {
@@ -122,8 +140,9 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
       if (restore) {
         _name.text = status['name'] as String;
         _number.text = status['number'] as String;
-        _preset = (status['style'] as int).clamp(0, customPreset);
+        _preset = (status['style'] as int).clamp(0, presets.length - 1);
         _fullScreen = status['full'] as bool;
+        _repeat = status['repeat'] == true;
         _design = CallDesign.decode(status['design'] as String?);
       }
     });
@@ -132,6 +151,8 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
         (status['time'] as int) - DateTime.now().millisecondsSinceEpoch;
     if (remaining > 0) {
       _refreshTimer = Timer(Duration(milliseconds: remaining + 100), _refresh);
+    } else if (_hasScheduledCall(status) && status['alarms'] == true) {
+      _refreshTimer = Timer(const Duration(seconds: 1), _refresh);
     }
   }
 
@@ -190,11 +211,18 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
   }
 
   Future<void> _schedule() async {
+    final repeat = _repeat;
+    final preset = _preset;
+    final systemPhone = _systemPhone;
     setState(() => _busy = true);
     try {
       final status = await calls.invokeMapMethod<String, dynamic>('status');
       if (status == null || !mounted) return;
-      if (status['notifications'] != true) {
+      if (systemPhone && status['systemPhoneReady'] != true) {
+        _message('Enable Exit Call in Calling accounts first.');
+        return;
+      }
+      if (!systemPhone && status['notifications'] != true) {
         final granted = await calls.invokeMethod<bool>('notifications');
         if (granted != true || !mounted) return;
       }
@@ -209,7 +237,7 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
         if (!mounted || _custom?.isAfter(DateTime.now()) != true) return;
       }
       var full = _fullScreen;
-      if (full && status['fullScreen'] != true) {
+      if (!systemPhone && full && status['fullScreen'] != true) {
         final useNotification = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -240,7 +268,7 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
         }
         full = false;
       }
-      if ((status['time'] as int) > DateTime.now().millisecondsSinceEpoch) {
+      if (_hasScheduledCall(status)) {
         final replace = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -270,12 +298,13 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
             'time': time.millisecondsSinceEpoch,
             'name': caller,
             'number': _number.text.trim(),
-            'style': _preset,
+            'style': preset,
             'full': full,
-            if (_preset == customPreset) 'design': _design.encode(),
+            'repeat': repeat,
+            if (preset == customPreset) 'design': _design.encode(),
           });
       if (scheduled != null) _apply(scheduled);
-      _message('Call scheduled');
+      _message(repeat ? 'Repeating call scheduled' : 'Call scheduled');
     } on PlatformException catch (error) {
       _message(error.message ?? 'Could not schedule the call.');
     } finally {
@@ -319,6 +348,26 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _openPhoneAccounts() async {
+    try {
+      await calls.invokeMethod<void>('openPhoneAccounts');
+    } on PlatformException catch (error) {
+      _message(error.message ?? 'Could not open Calling accounts.');
+    }
+  }
+
+  Future<void> _previewSystemCall() async {
+    try {
+      await calls.invokeMethod<void>('previewSystemCall', {
+        'name': caller,
+        'number': _number.text.trim(),
+      });
+      await _refresh();
+    } on PlatformException catch (error) {
+      _message(error.message ?? 'Could not show the system call.');
+    }
+  }
+
   Future<void> _cancel() async {
     try {
       final status = await calls.invokeMapMethod<String, dynamic>('cancel');
@@ -332,12 +381,17 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final time = _status['time'] as int? ?? 0;
-    final pending = time > DateTime.now().millisecondsSinceEpoch;
+    final pending = _hasScheduledCall(_status);
+    final repeating = _status['repeat'] == true;
     final permission = switch (_status) {
-      {'notifications': false} =>
+      {'systemCallFailed': true} when _systemPhone =>
+        'Android could not show the last system call. Check Calling accounts or try a preview.',
+      {'systemPhoneReady': false} when _systemPhone =>
+        'Enable Exit Call in Calling accounts.',
+      {'notifications': false} when !_systemPhone =>
         'Allow notifications when scheduling your first call.',
       {'alarms': false} => 'Enable Alarms & reminders for precise delivery.',
-      {'fullScreen': false} when _fullScreen =>
+      {'fullScreen': false} when !_systemPhone && _fullScreen =>
         'Enable full-screen access to show the call on the lock screen.',
       _ => null,
     };
@@ -363,11 +417,21 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                   _selectAppearance,
                 ),
                 const SizedBox(height: 6),
-                FilledButton.tonalIcon(
-                  onPressed: _busy || _status.isEmpty ? null : _editDesign,
-                  icon: const Icon(Icons.tune_rounded),
-                  label: const Text('Customize call screen'),
-                ),
+                if (_systemPhone) ...[
+                  TextButton(
+                    onPressed: _busy ? null : _openPhoneAccounts,
+                    child: const Text('Calling accounts'),
+                  ),
+                  Text(
+                    'The Phone app may save simulated calls to its history.',
+                    style: TextStyle(color: colors.onSurfaceVariant),
+                  ),
+                ] else
+                  FilledButton.tonalIcon(
+                    onPressed: _busy || _status.isEmpty ? null : _editDesign,
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('Customize call screen'),
+                  ),
                 if (pending) ...[
                   const SizedBox(height: 18),
                   ListTile(
@@ -376,15 +440,22 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     leading: const Icon(Icons.alarm),
-                    title: Text('Scheduled · ${_status['name']}'),
+                    title: Text(
+                      '${repeating ? 'Repeating' : 'Scheduled'} · ${_status['name']}',
+                    ),
                     subtitle: Text(
-                      _format(DateTime.fromMillisecondsSinceEpoch(time)),
+                      '${repeating ? 'Next · ' : ''}${_format(DateTime.fromMillisecondsSinceEpoch(time))}',
                     ),
-                    trailing: IconButton(
-                      tooltip: 'Cancel scheduled call',
-                      onPressed: _busy ? null : _cancel,
-                      icon: const Icon(Icons.close),
-                    ),
+                    trailing: repeating
+                        ? TextButton(
+                            onPressed: _busy ? null : _cancel,
+                            child: const Text('Stop'),
+                          )
+                        : IconButton(
+                            tooltip: 'Cancel scheduled call',
+                            onPressed: _busy ? null : _cancel,
+                            icon: const Icon(Icons.close),
+                          ),
                   ),
                 ],
                 const SizedBox(height: 20),
@@ -416,7 +487,7 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                         ),
                         const SizedBox(height: 14),
                         _dropdown(
-                          'Ring after',
+                          _repeat ? 'First call after' : 'Ring after',
                           delayLabels,
                           _delay,
                           (value) => setState(() => _delay = value),
@@ -435,11 +506,20 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                         ],
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Show on lock screen'),
-                          value: _fullScreen,
-                          onChanged: (value) =>
-                              setState(() => _fullScreen = value),
+                          title: const Text('Repeat every minute'),
+                          value: _repeat,
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() => _repeat = value),
                         ),
+                        if (!_systemPhone)
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Show on lock screen'),
+                            value: _fullScreen,
+                            onChanged: (value) =>
+                                setState(() => _fullScreen = value),
+                          ),
                       ],
                     ),
                   ),
@@ -459,17 +539,19 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                   label: const Text('Schedule call'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => IncomingCall(
-                        name: caller,
-                        number: _number.text.trim(),
-                        preset: _preset,
-                        design: _design,
-                      ),
-                    ),
-                  ),
+                  onPressed: _systemPhone
+                      ? (_busy ? null : _previewSystemCall)
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => IncomingCall(
+                              name: caller,
+                              number: _number.text.trim(),
+                              preset: _preset,
+                              design: _design,
+                            ),
+                          ),
+                        ),
                   icon: const Icon(Icons.phone_in_talk_outlined),
                   label: const Text('Preview incoming call'),
                 ),

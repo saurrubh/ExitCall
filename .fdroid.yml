@@ -1,18 +1,18 @@
 Categories:
   - Phone & SMS
 License: MIT
-SourceCode: https://github.com/saurrubh/endcalls
-IssueTracker: https://github.com/saurrubh/endcalls/issues
+SourceCode: https://github.com/saurrubh/ExitCall
+IssueTracker: https://github.com/saurrubh/ExitCall/issues
 
 AutoName: Exit Call
 
 RepoType: git
-Repo: https://github.com/saurrubh/endcalls.git
+Repo: https://github.com/saurrubh/ExitCall.git
 
 Builds:
-  - versionName: 1.3.2
-    versionCode: 7
-    commit: v1.3.2
+  - versionName: 1.4.0
+    versionCode: 8
+    commit: v1.4.0
     output: build/app/outputs/flutter-apk/app-release.apk
     srclibs:
       - flutter@ae9b586f34a8443573f82ef57c3bf914a908cbf7
@@ -31,5 +31,5 @@ Builds:
 AutoUpdateMode: None
 UpdateCheckMode: Tags
 UpdateCheckData: pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+
-CurrentVersion: 1.3.2
-CurrentVersionCode: 7
+CurrentVersion: 1.4.0
+CurrentVersionCode: 8

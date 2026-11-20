@@ -12,6 +12,7 @@ public final class CallAlarm extends BroadcastReceiver {
     static final String DECLINE = "local.exitcall.DECLINE";
     static final int ALERT = 1;
     static final long RING_MS = 45_000;
+    private static final long REPEAT_MS = 60_000;
 
     static SharedPreferences state(Context context) {
         return context.getSharedPreferences("calls", Context.MODE_PRIVATE);
@@ -46,18 +47,53 @@ public final class CallAlarm extends BroadcastReceiver {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    private static void arm(Context context, long time, boolean repeat) {
+        AlarmManager manager = context.getSystemService(AlarmManager.class);
+        PendingIntent delivery = alarm(context, time);
+        if (repeat) {
+            Intent scheduler = new Intent(context, MainActivity.class)
+                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent show = PendingIntent.getActivity(context, 2, scheduler,
+                    PendingIntent.FLAG_IMMUTABLE);
+            manager.setAlarmClock(new AlarmManager.AlarmClockInfo(time, show), delivery);
+        } else {
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, delivery);
+        }
+    }
+
     static void schedule(Context context, long time, String name, String number, int style,
-                         boolean fullScreen, String design) {
-        context.getSystemService(AlarmManager.class)
-                .setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, alarm(context, time));
+                         boolean fullScreen, String design, boolean repeat) {
+        arm(context, time, repeat);
         state(context).edit().putLong("time", time).putString("name", name)
-                .putString("number", number).putInt("style", style)
-                .putBoolean("full", fullScreen).putString("scheduled_design", design).apply();
+                .putString("number", number).putInt("style", style).putBoolean("repeat", repeat)
+                .putBoolean("full", fullScreen).putString("scheduled_design", design)
+                .remove("system_call_failed").apply();
     }
 
     static void cancel(Context context) {
-        state(context).edit().remove("time").remove("scheduled_design").apply();
+        SharedPreferences saved = state(context);
+        boolean repeat = saved.getBoolean("repeat", false);
+        clearSchedule(saved);
         context.getSystemService(AlarmManager.class).cancel(alarm(context, 0));
+        if (repeat) {
+            notifications(context).cancel(ALERT);
+            SystemCallService.stopRepeatingRing();
+        }
+    }
+
+    private static void clearSchedule(SharedPreferences saved) {
+        saved.edit().remove("time").remove("repeat").remove("scheduled_design").apply();
+    }
+
+    private static void restoreAlarm(Context context, SharedPreferences saved, long time,
+                                     boolean repeat) {
+        if (!canSchedule(context)) return;
+        try {
+            arm(context, time, repeat);
+            saved.edit().putLong("time", time).apply();
+        } catch (SecurityException ignored) {
+            // Keep the schedule so Android can restore it if exact alarm access is granted again.
+        }
     }
 
     @Override public void onReceive(Context context, Intent intent) {
@@ -68,20 +104,37 @@ public final class CallAlarm extends BroadcastReceiver {
             return;
         }
         long time = saved.getLong("time", 0);
+        if (time == 0) return;
+        long now = System.currentTimeMillis();
+        boolean repeat = saved.getBoolean("repeat", false);
         if (!FIRE.equals(intent.getAction())) {
-            if (time > System.currentTimeMillis() && canSchedule(context)) {
-                context.getSystemService(AlarmManager.class)
-                        .setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, alarm(context, time));
+            if (time > now) {
+                restoreAlarm(context, saved, time, repeat);
+            } else if (repeat) {
+                restoreAlarm(context, saved, now + REPEAT_MS, true);
             }
             return;
         }
-        if (time == 0 || time != intent.getLongExtra("time", 0)) return;
+        if (time > now || time != intent.getLongExtra("time", 0)) return;
         String design = saved.getString("scheduled_design", null);
-        saved.edit().remove("time").remove("scheduled_design").apply();
+        if (repeat) {
+            restoreAlarm(context, saved, now + REPEAT_MS, true);
+            if (CallActivity.hasVisibleAnsweredCall() || SystemCallService.isBusy()) return;
+        } else {
+            clearSchedule(saved);
+        }
         String name = saved.getString("name", "Unknown caller");
         int style = saved.getInt("style", 0);
+        String number = saved.getString("number", "");
+        if (style == SystemCallService.STYLE) {
+            long nextRepeat = repeat ? saved.getLong("time", 0) : 0;
+            if (!SystemCallService.ring(context, name, number, nextRepeat)) {
+                saved.edit().putBoolean("system_call_failed", true).apply();
+            }
+            return;
+        }
         PendingIntent open = PendingIntent.getActivity(context, 1,
-                screen(context, name, saved.getString("number", ""), style,
+                screen(context, name, number, style,
                         System.currentTimeMillis() + RING_MS, design),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent decline = PendingIntent.getBroadcast(context, 2,
