@@ -28,7 +28,7 @@ The shortcut checks the volume-key gesture and the buttons keep adjusting the vo
 
 Turn the service off in **Background shortcut settings** whenever you want to disable the shortcut outside Exit Call. If Android restricts the Accessibility switch for a sideloaded copy you trust, see [Android's restricted settings help](https://support.google.com/android/answer/12623953).
 
-The volume shortcut is available in builds from the current source.
+The volume shortcut is available in v1.5.0 and later.
 
 ## Designing a call screen
 

@@ -4,4 +4,6 @@ Choose a preset or design your own screen. Move the caller name, number, avatar,
 
 Repeat a call every minute until you tap Stop. On compatible devices, System Phone lets the default Phone app show the incoming call after you enable Exit Call in Calling accounts.
 
+Press Volume Up twice to schedule a call in 10 seconds. The optional Accessibility service lets you use the shortcut from another app.
+
 The simulation runs on your device. Lock-screen delivery depends on your Android settings.

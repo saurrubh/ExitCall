@@ -1,0 +1,2 @@
+Press Volume Up twice to schedule one call for 10 seconds later.
+Enable the optional background shortcut in Android Accessibility to use it from another app or after dismissing Exit Call from Recents.
