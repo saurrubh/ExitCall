@@ -29,6 +29,11 @@ public final class CallAlarm extends BroadcastReceiver {
         return manager;
     }
 
+    static boolean canNotify(NotificationManager manager) {
+        return manager.areNotificationsEnabled()
+                && manager.getNotificationChannel(CHANNEL).getImportance() != NotificationManager.IMPORTANCE_NONE;
+    }
+
     static boolean canSchedule(Context context) {
         return Build.VERSION.SDK_INT < 31 ||
                 context.getSystemService(AlarmManager.class).canScheduleExactAlarms();

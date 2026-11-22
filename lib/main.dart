@@ -109,12 +109,14 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    calls.setMethodCallHandler(_handleAndroidCall);
     _refresh(restore: true);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    calls.setMethodCallHandler(null);
     _refreshTimer?.cancel();
     _name.dispose();
     _number.dispose();
@@ -138,10 +140,10 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
     setState(() {
       _status = status;
       if (restore) {
-        _name.text = status['name'] as String;
-        _number.text = status['number'] as String;
+        _name.text = (status['shortcutName'] ?? status['name']) as String;
+        _number.text = (status['shortcutNumber'] ?? status['number']) as String;
         _preset = (status['style'] as int).clamp(0, presets.length - 1);
-        _fullScreen = status['full'] as bool;
+        _fullScreen = (status['shortcutFull'] ?? status['full']) as bool;
         _repeat = status['repeat'] == true;
         _design = CallDesign.decode(status['design'] as String?);
       }
@@ -210,8 +212,19 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _schedule() async {
-    final repeat = _repeat;
+  Future<void> _handleAndroidCall(MethodCall call) async {
+    if (call.method == 'quickSchedule' &&
+        mounted &&
+        !_busy &&
+        _status.isNotEmpty &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      await _schedule(quick: true);
+    }
+  }
+
+  Future<void> _schedule({bool quick = false}) async {
+    final repeat = !quick && _repeat;
+    final delay = _delay;
     final preset = _preset;
     final systemPhone = _systemPhone;
     setState(() => _busy = true);
@@ -230,7 +243,8 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
         await calls.invokeMethod<void>('alarms');
         return;
       }
-      if (_delay == durations.length &&
+      if (!quick &&
+          delay == durations.length &&
           (_custom == null || !_custom!.isAfter(DateTime.now()))) {
         _message('Choose a future date and time.');
         await _pickTime();
@@ -290,9 +304,11 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
         );
         if (replace != true || !mounted) return;
       }
-      final time = _delay == durations.length
+      final time = quick
+          ? DateTime.now().add(const Duration(seconds: 10))
+          : delay == durations.length
           ? _custom!
-          : DateTime.now().add(Duration(seconds: durations[_delay]));
+          : DateTime.now().add(Duration(seconds: durations[delay]));
       final scheduled = await calls
           .invokeMapMethod<String, dynamic>('schedule', {
             'time': time.millisecondsSinceEpoch,
@@ -304,7 +320,13 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
             if (preset == customPreset) 'design': _design.encode(),
           });
       if (scheduled != null) _apply(scheduled);
-      _message(repeat ? 'Repeating call scheduled' : 'Call scheduled');
+      _message(
+        quick
+            ? 'Call scheduled in 10 seconds'
+            : repeat
+            ? 'Repeating call scheduled'
+            : 'Call scheduled',
+      );
     } on PlatformException catch (error) {
       _message(error.message ?? 'Could not schedule the call.');
     } finally {
@@ -345,6 +367,26 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
       await calls.invokeMethod<void>('setAppearance', value);
     } on PlatformException catch (error) {
       _message(error.message ?? 'Could not save your call appearance.');
+    }
+  }
+
+  Future<void> _saveShortcutDetails() async {
+    try {
+      await calls.invokeMethod<void>('saveShortcutDetails', {
+        'name': _name.text.trim(),
+        'number': _number.text.trim(),
+        'full': _fullScreen,
+      });
+    } on PlatformException catch (error) {
+      _message(error.message ?? 'Could not save the shortcut caller.');
+    }
+  }
+
+  Future<void> _openBackgroundShortcut() async {
+    try {
+      await calls.invokeMethod<void>('openBackgroundShortcut');
+    } on PlatformException catch (error) {
+      _message(error.message ?? 'Could not open Accessibility settings.');
     }
   }
 
@@ -468,6 +510,7 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                       children: [
                         TextField(
                           controller: _name,
+                          onChanged: (_) => _saveShortcutDetails(),
                           maxLength: 70,
                           decoration: const InputDecoration(
                             labelText: 'Caller name',
@@ -478,6 +521,7 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                         const SizedBox(height: 14),
                         TextField(
                           controller: _number,
+                          onChanged: (_) => _saveShortcutDetails(),
                           keyboardType: TextInputType.phone,
                           maxLength: 40,
                           decoration: const InputDecoration(
@@ -517,8 +561,10 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Show on lock screen'),
                             value: _fullScreen,
-                            onChanged: (value) =>
-                                setState(() => _fullScreen = value),
+                            onChanged: (value) {
+                              setState(() => _fullScreen = value);
+                              unawaited(_saveShortcutDetails());
+                            },
                           ),
                       ],
                     ),
@@ -554,6 +600,26 @@ class _SchedulerState extends State<Scheduler> with WidgetsBindingObserver {
                         ),
                   icon: const Icon(Icons.phone_in_talk_outlined),
                   label: const Text('Preview incoming call'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _status['backgroundShortcut'] == true
+                      ? 'Press Volume Up twice for a call in 10 seconds, even in other apps.'
+                      : 'Press Volume Up twice here for a call in 10 seconds.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                Center(
+                  child: TextButton(
+                    onPressed: _openBackgroundShortcut,
+                    child: Text(
+                      _status['backgroundShortcut'] == true
+                          ? 'Background shortcut settings'
+                          : 'Enable background shortcut',
+                    ),
+                  ),
                 ),
               ],
             ),

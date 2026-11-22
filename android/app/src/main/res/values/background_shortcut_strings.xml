@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_shortcut_name">Exit Call volume shortcut</string>
+    <string name="background_shortcut_description">Uses two quick Volume Up presses to schedule a simulated call 10 seconds later. The buttons continue to adjust volume.</string>
+</resources>

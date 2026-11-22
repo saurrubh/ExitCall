@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.telecom.TelecomManager;
+import android.view.KeyEvent;
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
@@ -18,16 +19,31 @@ import java.util.Map;
 public class MainActivity extends FlutterActivity {
     static final String CHANNEL = "local.exitcall/calls";
     private static final int REQUEST_NOTIFICATIONS = 1;
+    private static boolean shortcutFocus;
+    private final VolumeUpDoublePress shortcut = new VolumeUpDoublePress();
     private MethodChannel.Result notificationRequest;
+    private MethodChannel channel;
 
     @Override public void configureFlutterEngine(FlutterEngine engine) {
         super.configureFlutterEngine(engine);
-        MethodChannel channel = new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), CHANNEL);
+        channel = new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), CHANNEL);
         channel.setMethodCallHandler((call, result) -> {
             try {
                 switch (call.method) {
                     case "status":
                         result.success(status());
+                        break;
+                    case "openBackgroundShortcut":
+                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                        result.success(null);
+                        break;
+                    case "saveShortcutDetails":
+                        CallAlarm.state(this).edit()
+                                .putString(BackgroundShortcutService.CALLER, call.argument("name"))
+                                .putString(BackgroundShortcutService.NUMBER, call.argument("number"))
+                                .putBoolean(BackgroundShortcutService.FULL,
+                                        Boolean.TRUE.equals(call.argument("full"))).apply();
+                        result.success(null);
                         break;
                     case "saveDesign":
                         CallAlarm.state(this).edit()
@@ -101,12 +117,35 @@ public class MainActivity extends FlutterActivity {
         });
     }
 
+    static boolean hasShortcutFocus() {
+        return shortcutFocus;
+    }
+
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (shortcut.matches(event) && channel != null) {
+            channel.invokeMethod("quickSchedule", null);
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        shortcutFocus = hasFocus;
+        if (!hasFocus) shortcut.reset();
+    }
+
+    @Override protected void onPause() {
+        shortcutFocus = false;
+        shortcut.reset();
+        super.onPause();
+    }
+
     private Map<String, Object> status() {
         SharedPreferences saved = CallAlarm.state(this);
         NotificationManager manager = CallAlarm.notifications(this);
         Map<String, Object> status = new HashMap<>();
-        status.put("notifications", manager.areNotificationsEnabled()
-                && manager.getNotificationChannel(CallAlarm.CHANNEL).getImportance() != NotificationManager.IMPORTANCE_NONE);
+        status.put("notifications", CallAlarm.canNotify(manager));
+        status.put("backgroundShortcut", BackgroundShortcutService.isEnabled(this));
         status.put("alarms", CallAlarm.canSchedule(this));
         status.put("systemPhoneReady", SystemCallService.isReady(this));
         status.put("systemCallFailed", saved.getBoolean("system_call_failed", false));
@@ -118,6 +157,9 @@ public class MainActivity extends FlutterActivity {
         status.put("style", saved.getInt("appearance", saved.getInt("style", 0)));
         status.put("full", saved.getBoolean("full", true));
         status.put("design", saved.getString("design", null));
+        status.put("shortcutName", saved.getString(BackgroundShortcutService.CALLER, null));
+        status.put("shortcutNumber", saved.getString(BackgroundShortcutService.NUMBER, null));
+        status.put("shortcutFull", saved.getBoolean(BackgroundShortcutService.FULL, saved.getBoolean("full", true)));
         return status;
     }
 

@@ -17,6 +17,15 @@
         <activity android:name=".CallActivity" android:exported="false" android:excludeFromRecents="true"
             android:taskAffinity="local.exitcall.incoming" android:showWhenLocked="true" android:turnScreenOn="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+        <service android:name=".BackgroundShortcutService" android:exported="true"
+            android:label="@string/background_shortcut_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/background_shortcut_service" />
+        </service>
         <service android:name=".SystemCallService" android:exported="true"
             android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE">
             <intent-filter>

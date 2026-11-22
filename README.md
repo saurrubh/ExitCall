@@ -18,6 +18,18 @@ Exit Call keeps one schedule at a time. Calls are simulated locally.
 
 Android may ask you to allow notifications and **Alarms & reminders** when you schedule your first call. Turn on **Show on lock screen** if you want the incoming screen to open over the lock screen. Depending on your Android settings, the call may appear as a notification you can tap to open.
 
+## Volume Up shortcut
+
+Press **Volume Up** twice quickly on the main screen to schedule one call for 10 seconds later. It uses the caller and call appearance you picked.
+
+To use the shortcut from another app, tap **Enable background shortcut** in Exit Call. Turn on **Exit Call volume shortcut** under Android's **Accessibility** settings, then leave the app or dismiss it from Recents. Keep the display awake if your device suppresses volume events with the screen off.
+
+The shortcut checks the volume-key gesture and the buttons keep adjusting the volume. Android's **Alarms & reminders** access is required for scheduling. The built-in appearances also need notifications, and **System Phone** needs its calling account. If a call is already scheduled, the background shortcut leaves it in place.
+
+Turn the service off in **Background shortcut settings** whenever you want to disable the shortcut outside Exit Call. If Android restricts the Accessibility switch for a sideloaded copy you trust, see [Android's restricted settings help](https://support.google.com/android/answer/12623953).
+
+The volume shortcut is available in builds from the current source.
+
 ## Designing a call screen
 
 Tap **Customize call screen** near the top of the home screen. Drag items around the preview or use the position sliders to place them precisely. You can change text and button sizes, choose solid or gradient colors, and set a gesture for each call control. Switch between incoming and answered previews as you work. Saving selects your **Custom** appearance, ready for a preview or a scheduled call.
