@@ -19,7 +19,9 @@ import java.util.Map;
 public class MainActivity extends FlutterActivity {
     static final String CHANNEL = "local.exitcall/calls";
     private static final int REQUEST_NOTIFICATIONS = 1;
-    private static boolean shortcutFocus;
+    private static final String CALLER_NAME = "shortcut_caller";
+    private static final String CALLER_NUMBER = "shortcut_number";
+    private static final String CALLER_FULL_SCREEN = "shortcut_full";
     private final VolumeUpDoublePress shortcut = new VolumeUpDoublePress();
     private MethodChannel.Result notificationRequest;
     private MethodChannel channel;
@@ -33,15 +35,11 @@ public class MainActivity extends FlutterActivity {
                     case "status":
                         result.success(status());
                         break;
-                    case "openBackgroundShortcut":
-                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                        result.success(null);
-                        break;
-                    case "saveShortcutDetails":
+                    case "saveCallerSettings":
                         CallAlarm.state(this).edit()
-                                .putString(BackgroundShortcutService.CALLER, call.argument("name"))
-                                .putString(BackgroundShortcutService.NUMBER, call.argument("number"))
-                                .putBoolean(BackgroundShortcutService.FULL,
+                                .putString(CALLER_NAME, call.argument("name"))
+                                .putString(CALLER_NUMBER, call.argument("number"))
+                                .putBoolean(CALLER_FULL_SCREEN,
                                         Boolean.TRUE.equals(call.argument("full"))).apply();
                         result.success(null);
                         break;
@@ -117,10 +115,6 @@ public class MainActivity extends FlutterActivity {
         });
     }
 
-    static boolean hasShortcutFocus() {
-        return shortcutFocus;
-    }
-
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (shortcut.matches(event) && channel != null) {
             channel.invokeMethod("quickSchedule", null);
@@ -130,12 +124,10 @@ public class MainActivity extends FlutterActivity {
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        shortcutFocus = hasFocus;
         if (!hasFocus) shortcut.reset();
     }
 
     @Override protected void onPause() {
-        shortcutFocus = false;
         shortcut.reset();
         super.onPause();
     }
@@ -145,7 +137,6 @@ public class MainActivity extends FlutterActivity {
         NotificationManager manager = CallAlarm.notifications(this);
         Map<String, Object> status = new HashMap<>();
         status.put("notifications", CallAlarm.canNotify(manager));
-        status.put("backgroundShortcut", BackgroundShortcutService.isEnabled(this));
         status.put("alarms", CallAlarm.canSchedule(this));
         status.put("systemPhoneReady", SystemCallService.isReady(this));
         status.put("systemCallFailed", saved.getBoolean("system_call_failed", false));
@@ -157,9 +148,9 @@ public class MainActivity extends FlutterActivity {
         status.put("style", saved.getInt("appearance", saved.getInt("style", 0)));
         status.put("full", saved.getBoolean("full", true));
         status.put("design", saved.getString("design", null));
-        status.put("shortcutName", saved.getString(BackgroundShortcutService.CALLER, null));
-        status.put("shortcutNumber", saved.getString(BackgroundShortcutService.NUMBER, null));
-        status.put("shortcutFull", saved.getBoolean(BackgroundShortcutService.FULL, saved.getBoolean("full", true)));
+        status.put("callerName", saved.getString(CALLER_NAME, null));
+        status.put("callerNumber", saved.getString(CALLER_NUMBER, null));
+        status.put("callerFullScreen", saved.getBoolean(CALLER_FULL_SCREEN, saved.getBoolean("full", true)));
         return status;
     }
 

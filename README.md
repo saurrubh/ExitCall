@@ -22,11 +22,7 @@ Android may ask you to allow notifications and **Alarms & reminders** when you s
 
 Press **Volume Up** twice quickly on the main screen to schedule one call for 10 seconds later. It uses the caller and call appearance you picked.
 
-To use the shortcut from another app, tap **Enable background shortcut** in Exit Call. Turn on **Exit Call volume shortcut** under Android's **Accessibility** settings, then leave the app or dismiss it from Recents. Keep the display awake if your device suppresses volume events with the screen off.
-
 The shortcut checks the volume-key gesture and the buttons keep adjusting the volume. Android's **Alarms & reminders** access is required for scheduling. The built-in appearances also need notifications, and **System Phone** needs its calling account. If a call is already scheduled, the background shortcut leaves it in place.
-
-Turn the service off in **Background shortcut settings** whenever you want to disable the shortcut outside Exit Call. If Android restricts the Accessibility switch for a sideloaded copy you trust, see [Android's restricted settings help](https://support.google.com/android/answer/12623953).
 
 The volume shortcut is available in v1.5.0 and later.
 
